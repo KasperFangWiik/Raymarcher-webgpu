@@ -94,8 +94,8 @@ fn vs_main(vertIn: VertexInput) -> VertexOutput {
 
     rd.y *= -1.0; // flip y coordinate because it's fliped in wgsl
 
-    let layers: i32 = 7; 
-    let fov: f32 = radians(90);//(In.iResolution.x/In.iResolution.y);//radians(90);//radians(30);//radians(45);//radians(90);//3.14159265/100.;//*0.5;//*2.0;//3.14159265 * 0.5;//3.14159265;//3.14159265 * 0.5;//1.5708;//90degree// 0.7854;//PI/4.0;
+    let layers: i32 = 10; 
+    let fov: f32 = (In.iResolution.x/In.iResolution.y);//radians(90);//radians(30);//radians(45);//radians(90);//3.14159265/100.;//*0.5;//*2.0;//3.14159265 * 0.5;//3.14159265;//3.14159265 * 0.5;//1.5708;//90degree// 0.7854;//PI/4.0;
 
     let coneVal: vec2f = Conemarch( ro, rd, fov, layers);
     out.coneDist = coneVal.x;
@@ -219,7 +219,7 @@ fn get_random_noize_corner(ij: vec2f) -> f32 {
 fn get_random_noize_corner(ij: vec2f) -> f32 {
     let noiseTextureSize = 256.0;
     let rayPosInUV = (ij + 0.5) / noiseTextureSize;// + 0.5 centers in the center of the texel
-    return textureSampleLevel(grayNoiseTexture, textureSampler, rayPosInUV, 0.0).r* 2.0 - 1.0;
+    return textureSampleLevel(grayNoiseTexture, textureSampler, rayPosInUV, 0.0).r;//* 2.0 - 1.0;
     //return textureSample(grayNoiseTexture, textureSampler, rayPosInUV, 0.0).r;
     /*
     textureSample() uses implicit derivatives (dpdx/dpdy) to determine the appropriate mip level. Those derivatives are available in the fragment stage, but not in the vertex stage.
@@ -244,6 +244,14 @@ fn get_random_noize_corner(ij: vec2f) -> f32{
 
 
 // generate the four coners depending on xz-coordinates and then SmoothStep between them
+
+
+fn f(p: vec2f)-> f32{
+    let noiseTextureSize = 256.0;
+    let rayPosInUV = (p + 0.5) / noiseTextureSize;// + 0.5 centers in the center of the texel
+    return textureSampleLevel(grayNoiseTexture, textureSampler, rayPosInUV, 0.0).r;
+}
+/*
 fn f(p: vec2f)-> f32{
 
     //float i = ij.x;
@@ -280,6 +288,56 @@ fn f(p: vec2f)-> f32{
     return (a_ij + ba_difz + ca_difx + abcd_dif*s_x*s_z);
 }
 
+
+fn mountainNormal(p: vec3f, normls_layers: i32) -> vec3f{
+    //const float EPS = 0.000001;
+    let EPS: f32 = 0.005;//0.0005;
+    
+    /*
+    n = Cross_product( (1., df/dz ,0.) , (0., df/dx ,1.) =>
+    n = ( -df/dx , 1. , -df/dz )
+    */
+    
+    // vec3(x, y, z)
+    
+    // Sample the ground sdf in x-axis and z-axis
+    let x0_sampl: f32 = SDF_scene(p + vec3f(EPS, 0.0, 0.0),normls_layers,false).sd;
+    let x1_sampl: f32 = SDF_scene(p - vec3f(EPS, 0.0, 0.0),normls_layers,false).sd;
+    
+    let z0_sampl: f32 = SDF_scene(p + vec3f(0.0, 0.0, EPS),normls_layers,false).sd;
+    let z1_sampl: f32 = SDF_scene(p - vec3f(0.0, 0.0, EPS),normls_layers,false).sd;
+    
+    // getting the difference/change in x-axis and z-axis
+    let neg_dx: f32 = x0_sampl - x1_sampl ; // = -( x0_sampl - x1_sampl)
+    let neg_dz: f32 = z0_sampl - z1_sampl; // = -( z0_sampl - z1_sampl)
+    
+    return normalize(vec3f(neg_dx, EPS, neg_dz));
+}
+*/
+fn f_df(p: vec2f) -> vec3f{
+    let noiseTextureSize = 256.0;
+    let rayPosInUV = (p ) / noiseTextureSize;// + 0.5 centers in the center of the texel
+    let f_val:f32 = textureSampleLevel(grayNoiseTexture, textureSampler, rayPosInUV, 0.0).r;
+    let offset: vec2f = vec2f(1.0, 0.0);
+
+    let rayPosInUVX = ((p+offset.xy)) / noiseTextureSize;
+    let px0:f32 = textureSampleLevel(grayNoiseTexture, textureSampler, rayPosInUVX, 0.0).r;
+    let rayPosInUVX_min = ((p-offset.xy)) / noiseTextureSize;
+    let px1:f32 = textureSampleLevel(grayNoiseTexture, textureSampler, rayPosInUVX_min, 0.0).r;
+
+
+    let rayPosInUVY = ((p+offset.yx)) / noiseTextureSize;
+    let py0:f32 = textureSampleLevel(grayNoiseTexture, textureSampler, rayPosInUVY, 0.0).r;
+    let rayPosInUVY_min = ((p-offset.yx)) / noiseTextureSize;
+    let py1:f32 = textureSampleLevel(grayNoiseTexture, textureSampler, rayPosInUVY_min, 0.0).r;
+
+    let dx = px0 - px1;
+    let dy = py0 - py1;
+    let df = vec2f(dx,dy);
+
+    return vec3f(f_val,df);
+}
+/*
 fn f_df(p: vec2f) -> vec3f{
 
     // creat a descreat grid
@@ -325,10 +383,10 @@ fn f_df(p: vec2f) -> vec3f{
     df.y = (b_ij - a_ij)* s_dz + abcd_dif*s_x*s_dz;
      
     return vec3f(f_val,df);
-}
+}*/
 
 fn N_func(p: vec2f, coord_scale: f32, layers: i32) -> f32{
-
+    //return f(p);
     //var rot: mat2x2<f32> = mat2x2<f32>(0.8, -0.6, 0.6, 0.8);//mat2x2<f32>(4./5., -3./5., 3/5, 4/5);
     
     var rot: mat2x2<f32> = mat2x2<f32>(0.8, 0.6, -0.6, 0.8);
@@ -347,12 +405,13 @@ fn N_func(p: vec2f, coord_scale: f32, layers: i32) -> f32{
         pr = 2.0 * (pr * rot);
    }
    return N_val;
+   
 }
 
 fn N_deriv(p: vec2f, coord_scale: f32, layers: i32) -> vec3f{
-
+    //return f_df(p);
     //var rot: mat2x2<f32> = mat2x2<f32>(0.8, -0.6, 0.6, 0.8);//mat2(4./5., -3./5., 3/5, 4/5);
-
+    
     var rot: mat2x2<f32> = mat2x2<f32>(0.8, 0.6, -0.6, 0.8);
   
     var pr: vec2f = p * coord_scale;// * 0.002; // 1/2000
@@ -391,6 +450,7 @@ fn N_deriv(p: vec2f, coord_scale: f32, layers: i32) -> vec3f{
    N_val.z *= coord_scale;
    
    return vec3f(N_val.x, N_val.yz);
+   
 }
 
 fn sdPlane_enviornment(p: vec3f, offset: f32, layers: i32) -> f32{
@@ -400,7 +460,7 @@ fn sdPlane_enviornment(p: vec3f, offset: f32, layers: i32) -> f32{
     
     var N: f32 = N_func(p.xz, coord_scale, layers);
    
-    let height_multiplier: f32 = 600.0*0.8;//600.0*0.6;//* 0.3;
+    let height_multiplier: f32 = 600.0*0.7;//600.0*0.6;//* 0.3;
     
     // Explicit Distance Calculation
     //return (p.y - (N * height_multiplier + 600.0*0.6) - offset);//180.0); 
@@ -417,10 +477,10 @@ fn sd_derivPlane_enviornment(p: vec3f, offset: f32, layers: i32) -> vec4f{
     var h: f32 = val.x;
     var deriv: vec2f = val.yz; 
     
-    var height_multiplier: f32 = 600.0*0.6;// * 0.3;
+    var height_multiplier: f32 = 600.0*0.7;// * 0.3;
     
     // Explicit Distance Calculation
-    var d: f32 = p.y - (h * height_multiplier + 600.0*0.6);//180.0); 
+    var d: f32 = p.y - (h * height_multiplier + height_multiplier);//180.0); 
     
     // Account for global multipliers and initial coordinate scaling
     deriv = height_multiplier * deriv;
@@ -743,7 +803,7 @@ fn Raymarch(ro: vec3f, rd: vec3f, start_t_distance: f32, start_index: i32)-> vec
     var shadow_acne_EPS: f32 = 1.0;
     
     var is_analytic: bool = true;//false;// funkar inte med "normal_layer" (måste beräkna hela)
-    var physical_layers: i32 = 7;
+    var physical_layers: i32 = 10;
     var normal_layers: i32 = 10;
     
     // LOD verkar i

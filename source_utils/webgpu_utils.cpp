@@ -1049,7 +1049,7 @@ bool Application::Initialize(){ // this seams a bit old school...
 
 	// shaderToy resolution: 800 x 450 
 	window_width = 800;// 480;//800;//1600;;//640.0;
-	window_height = 800;//480;//800;//450;//900;//640.0;//480.0;
+	window_height = 450;//480;//800;//450;//900;//640.0;//480.0;
 
 	window = glfwCreateWindow(window_width, window_height, "Learn WebGPU", nullptr, nullptr);
 	if (!window) {
@@ -1080,8 +1080,8 @@ bool Application::Initialize(){ // this seams a bit old school...
 
 	WGPUDeviceDescriptor deviceDesc = {};  
 	WGPURequiredLimits limits = setRequredLimits();
-	size_t featureCount = 1;
-	WGPUFeatureName featutes[1] = {WGPUFeatureName_TimestampQuery};
+	size_t featureCount = 2;
+	WGPUFeatureName featutes[2] = {WGPUFeatureName_TimestampQuery, WGPUFeatureName_Float32Filterable};
 
 	// we should make a function that checks for the feature and tells oss if the adapter/device has it and then we can use that ifo to stop  using it...
 	setDeviceDescriptor(deviceDesc, limits, featureCount, featutes);
@@ -1099,7 +1099,10 @@ bool Application::Initialize(){ // this seams a bit old school...
 	InitializeUniformStructBuffer();
 	//pipeline = getVertexAttrRenderPipeline(device, surfaceFormat);//getStandardPipeline(device, surfaceFormat);
 	InitializeTextureSampler();
-	grayNoiseView = InitializeGrayNoiseTexture(); // sets the texture view for grayNoise texture
+	
+	//grayNoiseView = InitializeGrayNoiseTexture(); // sets the texture view for grayNoise texture
+	ComputePassCreatTexture();
+	
 	pipeline = getVertexMultAttrRenderPipeline(
 		device, 
 		surfaceFormat,
@@ -1299,6 +1302,9 @@ void Application::Terminate(){
 	//wgpuTextureViewDestroy(grayNoiseView);
 	wgpuTextureViewRelease(grayNoiseView);
 
+// computePass cleanup:
+	wgpuComputePipelineRelease(computePipeline);
+// End of computePass cleanup
 
 	wgpuBufferRelease(pointBuffer);
 	wgpuBufferRelease(indexBuffer);
@@ -1414,6 +1420,17 @@ WGPURequiredLimits Application::setRequredLimits(/*WGPUAdapter adapter*/) const{
 	// Add the possibility to sample a texture in a shader
 	requiredLimits.limits.maxSampledTexturesPerShaderStage = 1;
 	requiredLimits.limits.maxSamplersPerShaderStage = 1;
+
+	requiredLimits.limits.maxStorageTexturesPerShaderStage = 1;
+/*
+maxStorageTexturesPerShaderStage
+ uint32_t maxComputeWorkgroupStorageSize;
+    uint32_t maxComputeInvocationsPerWorkgroup;
+    uint32_t maxComputeWorkgroupSizeX;
+    uint32_t maxComputeWorkgroupSizeY;
+    uint32_t maxComputeWorkgroupSizeZ;
+    uint32_t maxComputeWorkgroupsPerDimension;
+*/
 
 	return requiredLimits;
 }
@@ -1683,7 +1700,7 @@ WGPUTextureView Application::InitializeGrayNoiseTexture(){
 	size of the texture, so when not using these features, setting them to 
 	(the minimum) saves memory.*/
 
-	textureDesc.format = WGPUTextureFormat_R8Unorm;
+	textureDesc.format = WGPUTextureFormat_R8Unorm; // this usage: | WGPUTextureUsage_StorageBinding; is incompatibale withWGPUTextureFormat_R8Unorm format, might f32 aka float might just be ok
 	textureDesc.usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst; // sampling it from a shader | copy pixel data from CPU 
 	
 	// Lastly, we initialize the texture view settings to 0 (more on this later):
@@ -1693,11 +1710,10 @@ WGPUTextureView Application::InitializeGrayNoiseTexture(){
 	grayNoise = wgpuDeviceCreateTexture(device, &textureDesc);
 	
 	// Creat noise data
-	std::vector<uint8_t> pixels(textureDesc.size.width * textureDesc.size.height);
+	std::vector<uint8_t> pixels(textureDesc.size.width * textureDesc.size.height); //{}
 	for(uint32_t j = 0; j < textureDesc.size.height; j++)
 		for(uint32_t i = 0; i < textureDesc.size.width; i++){
 			float noise = get_random_noize_corner((float)i,(float)j);//* 0.5f + 0.5f; // the noise is [-1, 1]
-
 			pixels[ j * textureDesc.size.width + i] = static_cast<uint8_t>(noise * 255.0f + 0.5f); // we add 0.5 så that the noise values that have a decimal value over zero rounds up
 		}
 
@@ -1753,5 +1769,150 @@ samplerDesc.maxAnisotropy = 1; // WHY THIS
 
 
  sampler = wgpuDeviceCreateSampler(device, &samplerDesc);
+}
 
+
+WGPUTextureView Application::CreatEmptyGrayNoiseTexture(){
+
+	WGPUTextureDescriptor textureDesc{};
+	textureDesc.nextInChain = nullptr;
+	textureDesc.label = " graynoise";
+
+	textureDesc.dimension = WGPUTextureDimension_2D;
+	textureDesc.size = { 256, 256, 1 };//{ 512, 512, 1 };
+	//                             ^ ignored because it is a 2D texture
+	textureDesc.mipLevelCount = 1;
+	textureDesc.sampleCount = 1; // numbers of samples for multisampling stuff
+	/*Both the mip level count and the sample count have an impact on the memory 
+	size of the texture, so when not using these features, setting them to 
+	(the minimum) saves memory.*/
+
+	textureDesc.format = WGPUTextureFormat_R32Float; // this usage: | WGPUTextureUsage_StorageBinding; is incompatibale withWGPUTextureFormat_R8Unorm format, might f32 aka float might just be ok
+	// I need to set the feature WGPUTextureFormat_R32Float if i want to use linear filter(sampling) stufff
+	
+	textureDesc.usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_StorageBinding; // sampling it from a shader | copy pixel data from CPU 
+	
+	// Lastly, we initialize the texture view settings to 0 (more on this later):
+	textureDesc.viewFormatCount = 0;
+	textureDesc.viewFormats = nullptr;
+
+	grayNoise = wgpuDeviceCreateTexture(device, &textureDesc);
+
+	WGPUTextureViewDescriptor textureViewDesc{};
+	textureViewDesc.aspect = WGPUTextureAspect_All;
+	textureViewDesc.baseArrayLayer = 0;
+	textureViewDesc.arrayLayerCount = 1;
+	textureViewDesc.baseMipLevel = 0;
+	textureViewDesc.mipLevelCount = 1;
+	textureViewDesc.dimension = WGPUTextureViewDimension_2D;
+	textureViewDesc.format = textureDesc.format;
+	return wgpuTextureCreateView(grayNoise, &textureViewDesc);;
+}
+
+void Application::ComputePassCreatTexture(){
+
+	WGPUCommandEncoderDescriptor encoderDesc = {}; 
+	encoderDesc.nextInChain = nullptr; 
+	encoderDesc.label = "Encoder for the compute pass";
+	WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(device, &encoderDesc);
+	
+	// DON'T forget to dubble check limitaions and features that might be needed ...
+	// creat compute pass
+
+// initialize computePipline:
+
+// BindGroupLayout:
+	WGPUBindGroupLayoutEntry textureBindingLayout{}; // The BindGroupLayoutEntry could have been called BindingLayout.
+	setDefault(textureBindingLayout);
+	textureBindingLayout.binding = 0;
+	/*
+	textureBindingLayout.visibility = WGPUShaderStage_Compute;
+	textureBindingLayout.texture.sampleType = WGPUTextureSampleType_Float;
+	textureBindingLayout.texture.viewDimension = WGPUTextureViewDimension_2D;
+	*/
+	textureBindingLayout.visibility = WGPUShaderStage_Compute;
+	textureBindingLayout.storageTexture.access = WGPUStorageTextureAccess_WriteOnly;
+	textureBindingLayout.storageTexture.format = WGPUTextureFormat_R32Float;
+	textureBindingLayout.storageTexture.viewDimension = WGPUTextureViewDimension_2D;
+
+	WGPUBindGroupLayoutDescriptor bindGroupLayoutDesc{};
+	bindGroupLayoutDesc.nextInChain = nullptr;
+	bindGroupLayoutDesc.label = "Noise texture bindgrouplayout";
+	bindGroupLayoutDesc.entryCount = 1;
+	bindGroupLayoutDesc.entries = &textureBindingLayout;
+	computeBindGroupLayout = wgpuDeviceCreateBindGroupLayout(device, &bindGroupLayoutDesc);
+// End BindGroupLayout
+
+// BindGroup:
+	grayNoiseView = CreatEmptyGrayNoiseTexture(); // theres nothing about this name that sugest the return of a textureView
+	
+	WGPUBindGroupEntry TextureBinding{};
+	TextureBinding.binding = 0;
+	TextureBinding.textureView = grayNoiseView;
+
+	WGPUBindGroupDescriptor bindGroupDesc{};
+	bindGroupDesc.label = "bindingGroup layout";
+	bindGroupDesc.nextInChain = nullptr;
+	bindGroupDesc.layout = computeBindGroupLayout;
+	bindGroupDesc.entryCount = 1;
+	bindGroupDesc.entries = &TextureBinding;
+	computeBindGroup = wgpuDeviceCreateBindGroup(device, &bindGroupDesc); 
+
+// End bindGroup
+
+// PipelineLayout:
+WGPUPipelineLayoutDescriptor pipelineLayoutDesc{};
+pipelineLayoutDesc.nextInChain = nullptr;
+pipelineLayoutDesc.label ="Compute piplineLayout";
+pipelineLayoutDesc.bindGroupLayoutCount = 1;
+pipelineLayoutDesc.bindGroupLayouts = &computeBindGroupLayout;
+computeLayout = wgpuDeviceCreatePipelineLayout(device, &pipelineLayoutDesc);
+// End PipelineLayout
+
+	WGPUShaderModule computeShaderModule = loadShaderModule(RESOURCE_DIR "/computeShader.wgsl", device);
+
+	WGPUComputePipelineDescriptor computePiplineDesc{};
+	computePiplineDesc.nextInChain = nullptr; // this is not one of those where this need to be not nullptr...
+	computePiplineDesc.label = "Noise compute shader pipeline";
+	computePiplineDesc.compute.entryPoint = "cs_main";
+	computePiplineDesc.compute.module = computeShaderModule;
+	computePiplineDesc.layout = computeLayout; // we should need to set this
+	computePiplineDesc.compute.nextInChain = nullptr;
+	computePipeline = wgpuDeviceCreateComputePipeline(device, &computePiplineDesc);
+// End initialize computePipline
+
+	WGPUComputePassDescriptor computePassDesc{};
+	computePassDesc.nextInChain = nullptr;
+	computePassDesc.label = "computepass";
+	computePassDesc.timestampWrites = nullptr;
+	WGPUComputePassEncoder computePass = wgpuCommandEncoderBeginComputePass(encoder,&computePassDesc);
+
+	wgpuComputePassEncoderSetPipeline(computePass, computePipeline);
+	wgpuComputePassEncoderSetBindGroup(computePass, 0, computeBindGroup, 0, nullptr);
+
+	/*
+	uint32_t invocationCountX = m_textureSize.width;
+	uint32_t invocationCountY = m_textureSize.height;
+	*/
+	//uint32_t invocationCount = 512;
+	uint32_t invocationCount = 256;
+	uint32_t workgroupSizePerDim = 4;
+	// This ceils invocationCountX / workgroupSizePerDim
+	uint32_t workgroupCount = (invocationCount + workgroupSizePerDim - 1) / workgroupSizePerDim;
+	
+	wgpuComputePassEncoderDispatchWorkgroups(computePass, workgroupCount, workgroupCount,1);//16,16,1);
+
+	wgpuComputePassEncoderEnd(computePass);
+	// Finalize compute pass
+	//computePass.end();
+
+
+	WGPUCommandBufferDescriptor commandDesc{};
+	WGPUCommandBuffer command = wgpuCommandEncoderFinish(encoder, &commandDesc);
+	wgpuQueueSubmit(queue, 1, &command);
+
+	// local cleanup of creat rescources
+	wgpuComputePassEncoderRelease(computePass);
+	wgpuCommandBufferRelease(command);
+    wgpuCommandEncoderRelease(encoder);
 }

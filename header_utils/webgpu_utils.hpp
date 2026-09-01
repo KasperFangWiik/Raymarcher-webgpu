@@ -205,5 +205,10 @@ class Application {
 
 		WGPUTextureView InitializeGrayNoiseTexture();
 		void InitializeTextureSampler();
-		
+		WGPUTextureView CreatEmptyGrayNoiseTexture();	
+		void ComputePassCreatTexture();
+		WGPUBindGroupLayout computeBindGroupLayout; // Retaining bindGroupLayout is also needed when we create the bind group that goes with it.
+		WGPUBindGroup computeBindGroup;
+		WGPUPipelineLayout computeLayout;
+		WGPUComputePipeline computePipeline;
 	};

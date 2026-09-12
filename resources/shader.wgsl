@@ -57,7 +57,7 @@ fn Conemarch(ro: vec3f,rd: vec3f, fov: f32, layers: i32) -> vec2f{
         if( d < cone_radius || (t >= 9000.)) {
             return vec2f(t, f32(i)); // max(t*0.3, 0.05)
         }
-        stepsize = d*0.5;// max(d*0.5,cone_radius*0.75);//== relaxation//*0.4; 
+        stepsize = d*0.5;//*0.5;// max(d*0.5,cone_radius*0.75);//== relaxation//*0.4; 
         //old_t = t;
         t += stepsize;//max(stepsize, 0.02);
     }
@@ -94,7 +94,7 @@ fn vs_main(vertIn: VertexInput) -> VertexOutput {
 
     rd.y *= -1.0; // flip y coordinate because it's fliped in wgsl
 
-    let layers: i32 = 10; 
+    let layers: i32 = 7; 
     let fov: f32 = (In.iResolution.x/In.iResolution.y);//radians(90);//radians(30);//radians(45);//radians(90);//3.14159265/100.;//*0.5;//*2.0;//3.14159265 * 0.5;//3.14159265;//3.14159265 * 0.5;//1.5708;//90degree// 0.7854;//PI/4.0;
 
     let coneVal: vec2f = Conemarch( ro, rd, fov, layers);
@@ -245,11 +245,31 @@ fn get_random_noize_corner(ij: vec2f) -> f32{
 
 // generate the four coners depending on xz-coordinates and then SmoothStep between them
 
+fn mod_i(x: i32, m: i32) -> i32 {
+    return ((x % m) + m) % m;
+}
+
 
 fn f(p: vec2f)-> f32{
-    let noiseTextureSize = 256.0;
+    /*
+    let noiseTextureSize = 512.0;
     let rayPosInUV = (p + 0.5) / noiseTextureSize;// + 0.5 centers in the center of the texel
-    return textureSampleLevel(grayNoiseTexture, textureSampler, rayPosInUV, 0.0).r;
+    let fvec:vec4f = textureSampleLevel(grayNoiseTexture, textureSampler, rayPosInUV, 0.0);
+    */
+    let ij = vec2i(floor(p));
+    let wrapped = vec2i(
+        mod_i(ij.x, 512),
+        mod_i(ij.y, 512)
+    );
+
+    let fvec:vec4f = textureLoad(grayNoiseTexture, ij, 0);
+    
+    let fr: vec2f = fract(p);
+    let sx = S(fr.x);
+    let sz = S(fr.y);
+
+    return (fvec.r + fvec.g*sx + fvec.b*sz + fvec.a*sx*sz);
+    //return textureSampleLevel(grayNoiseTexture, textureSampler, rayPosInUV, 0.0).r;
 }
 /*
 fn f(p: vec2f)-> f32{
@@ -315,20 +335,54 @@ fn mountainNormal(p: vec3f, normls_layers: i32) -> vec3f{
 }
 */
 fn f_df(p: vec2f) -> vec3f{
-    let noiseTextureSize = 256.0;
-    let rayPosInUV = (p ) / noiseTextureSize;// + 0.5 centers in the center of the texel
-    let f_val:f32 = textureSampleLevel(grayNoiseTexture, textureSampler, rayPosInUV, 0.0).r;
-    let offset: vec2f = vec2f(1.0, 0.0);
+    let noiseTextureSize = 512.0;
+    let rayPosInUV = (p + 0.5) / noiseTextureSize;// + 0.5 centers in the center of the texel
+    let fvec: vec4f = textureSampleLevel(grayNoiseTexture, textureSampler, rayPosInUV, 0.0);
+    let fr: vec2f = fract(p);
+    let sx = S(fr.x);
+    let sy = S(fr.y);
 
-    let rayPosInUVX = ((p+offset.xy)) / noiseTextureSize;
+    let f_val:f32 = (fvec.r + fvec.g*sx + fvec.b*sy + fvec.a*sx*sy);
+    let offset: vec2f = vec2f(1.0/noiseTextureSize, 0.0);
+
+    let rayPosInUVX = rayPosInUV + offset.xy;//((p+offset.xy)+ 0.5) / noiseTextureSize;
+    let px0Vec = textureSampleLevel(grayNoiseTexture, textureSampler, rayPosInUVX, 0.0);
+    let px0:f32 = (px0Vec.r + px0Vec.g*sx + px0Vec.b*sy + px0Vec.a*sx*sy);
+
+    let rayPosInUVX_min = rayPosInUV - offset.xy;//((p-offset.xy)+ 0.5) / noiseTextureSize;
+    let px1Vec = textureSampleLevel(grayNoiseTexture, textureSampler, rayPosInUVX_min, 0.0);
+    let px1:f32 = (px1Vec.r + px1Vec.g*sx + px1Vec.b*sy + px1Vec.a*sx*sy);
+
+    let rayPosInUVY = rayPosInUV + offset.yx;//((p+offset.yx)+ 0.5) / noiseTextureSize;
+    let py0Vec = textureSampleLevel(grayNoiseTexture, textureSampler, rayPosInUVY, 0.0);
+    let py0:f32 = (py0Vec.r + py0Vec.g*sx + py0Vec.b*sy + py0Vec.a*sx*sy);
+
+    let rayPosInUVY_min = rayPosInUV - offset.yx;//((p-offset.yx)+ 0.5) / noiseTextureSize;
+    let py1Vec = textureSampleLevel(grayNoiseTexture, textureSampler, rayPosInUVY_min, 0.0);
+    let py1:f32 = (py1Vec.r + py1Vec.g*sx + py1Vec.b*sy + py1Vec.a*sx*sy);
+
+    let dx = px0 - px1;
+    let dy = py0 - py1;
+    let df = vec2f(dx,dy);
+
+    return vec3f(f_val,df);
+}
+/*
+fn f_df(p: vec2f) -> vec3f{
+    let noiseTextureSize = 1024.0;
+    let rayPosInUV = (p + 0.5) / noiseTextureSize;// + 0.5 centers in the center of the texel
+    let f_val:f32 = textureSampleLevel(grayNoiseTexture, textureSampler, rayPosInUV, 0.0).r;
+    let offset: vec2f = vec2f(0.5, 0.0);
+
+    let rayPosInUVX = ((p+offset.xy)+ 0.5) / noiseTextureSize;
     let px0:f32 = textureSampleLevel(grayNoiseTexture, textureSampler, rayPosInUVX, 0.0).r;
-    let rayPosInUVX_min = ((p-offset.xy)) / noiseTextureSize;
+    let rayPosInUVX_min = ((p-offset.xy)+ 0.5) / noiseTextureSize;
     let px1:f32 = textureSampleLevel(grayNoiseTexture, textureSampler, rayPosInUVX_min, 0.0).r;
 
 
-    let rayPosInUVY = ((p+offset.yx)) / noiseTextureSize;
+    let rayPosInUVY = ((p+offset.yx)+ 0.5) / noiseTextureSize;
     let py0:f32 = textureSampleLevel(grayNoiseTexture, textureSampler, rayPosInUVY, 0.0).r;
-    let rayPosInUVY_min = ((p-offset.yx)) / noiseTextureSize;
+    let rayPosInUVY_min = ((p-offset.yx)+ 0.5) / noiseTextureSize;
     let py1:f32 = textureSampleLevel(grayNoiseTexture, textureSampler, rayPosInUVY_min, 0.0).r;
 
     let dx = px0 - px1;
@@ -337,6 +391,8 @@ fn f_df(p: vec2f) -> vec3f{
 
     return vec3f(f_val,df);
 }
+*/
+
 /*
 fn f_df(p: vec2f) -> vec3f{
 
@@ -386,7 +442,7 @@ fn f_df(p: vec2f) -> vec3f{
 }*/
 
 fn N_func(p: vec2f, coord_scale: f32, layers: i32) -> f32{
-    //return f(p);
+    return f(p);
     //var rot: mat2x2<f32> = mat2x2<f32>(0.8, -0.6, 0.6, 0.8);//mat2x2<f32>(4./5., -3./5., 3/5, 4/5);
     
     var rot: mat2x2<f32> = mat2x2<f32>(0.8, 0.6, -0.6, 0.8);
@@ -409,7 +465,7 @@ fn N_func(p: vec2f, coord_scale: f32, layers: i32) -> f32{
 }
 
 fn N_deriv(p: vec2f, coord_scale: f32, layers: i32) -> vec3f{
-    //return f_df(p);
+    return f_df(p);
     //var rot: mat2x2<f32> = mat2x2<f32>(0.8, -0.6, 0.6, 0.8);//mat2(4./5., -3./5., 3/5, 4/5);
     
     var rot: mat2x2<f32> = mat2x2<f32>(0.8, 0.6, -0.6, 0.8);
@@ -460,7 +516,7 @@ fn sdPlane_enviornment(p: vec3f, offset: f32, layers: i32) -> f32{
     
     var N: f32 = N_func(p.xz, coord_scale, layers);
    
-    let height_multiplier: f32 = 600.0*0.7;//600.0*0.6;//* 0.3;
+    let height_multiplier: f32 = 600.0;//*0.8;//600.0*0.6;//* 0.3;
     
     // Explicit Distance Calculation
     //return (p.y - (N * height_multiplier + 600.0*0.6) - offset);//180.0); 
@@ -477,7 +533,7 @@ fn sd_derivPlane_enviornment(p: vec3f, offset: f32, layers: i32) -> vec4f{
     var h: f32 = val.x;
     var deriv: vec2f = val.yz; 
     
-    var height_multiplier: f32 = 600.0*0.7;// * 0.3;
+    var height_multiplier: f32 = 600.0;//*0.8;// * 0.3;
     
     // Explicit Distance Calculation
     var d: f32 = p.y - (h * height_multiplier + height_multiplier);//180.0); 
@@ -707,7 +763,7 @@ fn Rmin(currentMinDist: f32,h: f32,t: f32) -> f32{
 fn sh(p: vec3f, lightDir: vec3f, EPS: f32, layers: i32) -> f32{
     
     var stepsize: f32= 0.;
-    var t: f32 = EPS*10.;//0.5; // shadow acne stepout
+    var t: f32 = EPS*3.0;//*10.;//0.5; // shadow acne stepout
     //vec3 lightDir = normalize(l - p);
     var hp: vec3f = vec3f(0.0);
     var d: f32 = 0.0;
@@ -726,7 +782,7 @@ fn sh(p: vec3f, lightDir: vec3f, EPS: f32, layers: i32) -> f32{
             return 0.;
         }
         old_t = t;
-        stepsize = d*0.3;//max(d * 0.4, 0.001);
+        stepsize = d*0.3;//0.5;//max(d * 0.4, 0.001);
         t += stepsize;
        
     }
@@ -791,8 +847,8 @@ fn Raymarch(ro: vec3f, rd: vec3f, start_t_distance: f32, start_index: i32)-> vec
     var sun_angle: vec3f = normalize( vec3f(sin(sie)*sin(fi), cos(sie),sin(sie)*cos(fi)));
     var ligPos: vec3f = radius * sun_angle;
     
-    let startDistance: f32 = start_t_distance;
-    let startIndex: i32 = start_index;
+    let startDistance: f32 = 0;// start_t_distance;
+    let startIndex: i32 = 0;//start_index;
 
     var b: Body;
     var p: vec3f;
@@ -803,8 +859,8 @@ fn Raymarch(ro: vec3f, rd: vec3f, start_t_distance: f32, start_index: i32)-> vec
     var shadow_acne_EPS: f32 = 1.0;
     
     var is_analytic: bool = true;//false;// funkar inte med "normal_layer" (måste beräkna hela)
-    var physical_layers: i32 = 10;
-    var normal_layers: i32 = 10;
+    var physical_layers: i32 = 7;
+    var normal_layers: i32 = 7;
     
     // LOD verkar i
     /*
@@ -850,8 +906,8 @@ fn Raymarch(ro: vec3f, rd: vec3f, start_t_distance: f32, start_index: i32)-> vec
         } 
         
       if(d <= EPS_colid*min(f32(i),10.)){ // *min(float(i),10.)
-            p = bisection(ro, rd, old_t, t+EPS_colid, 5, 0.0005, physical_layers, is_analytic);  
-            shadow_acne_EPS *= 4.;
+            //p = bisection(ro, rd, old_t, t+EPS_colid, 5, 0.0005, physical_layers, is_analytic);  
+            //shadow_acne_EPS *= 4.;
             
             var n: vec3f = vec3f(0.0);
             if(is_analytic){

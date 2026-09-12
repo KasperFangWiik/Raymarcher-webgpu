@@ -1762,8 +1762,8 @@ samplerDesc.label ="first Sampler";
 samplerDesc.lodMaxClamp = 1.0f; // WHY THIS
 samplerDesc.lodMinClamp = 0.0f; // WHY THIS
 
-samplerDesc.magFilter = WGPUFilterMode_Linear; // // WHY THIS
-samplerDesc.minFilter = WGPUFilterMode_Linear;
+samplerDesc.magFilter = WGPUFilterMode_Nearest;//WGPUFilterMode_Linear; // // WHY THIS
+samplerDesc.minFilter = WGPUFilterMode_Nearest;//WGPUFilterMode_Linear;
 samplerDesc.mipmapFilter = WGPUMipmapFilterMode_Linear;
 samplerDesc.maxAnisotropy = 1; // WHY THIS
 
@@ -1779,7 +1779,7 @@ WGPUTextureView Application::CreatEmptyGrayNoiseTexture(){
 	textureDesc.label = " graynoise";
 
 	textureDesc.dimension = WGPUTextureDimension_2D;
-	textureDesc.size = { 256, 256, 1 };//{ 512, 512, 1 };
+	textureDesc.size = { 512, 512, 1 };//{ 512, 512, 1 };////{ 2048, 2048, 1 };//{ 256, 256, 1 };//{ 512, 512, 1 };
 	//                             ^ ignored because it is a 2D texture
 	textureDesc.mipLevelCount = 1;
 	textureDesc.sampleCount = 1; // numbers of samples for multisampling stuff
@@ -1787,7 +1787,8 @@ WGPUTextureView Application::CreatEmptyGrayNoiseTexture(){
 	size of the texture, so when not using these features, setting them to 
 	(the minimum) saves memory.*/
 
-	textureDesc.format = WGPUTextureFormat_R32Float; // this usage: | WGPUTextureUsage_StorageBinding; is incompatibale withWGPUTextureFormat_R8Unorm format, might f32 aka float might just be ok
+	//textureDesc.format = WGPUTextureFormat_R32Float; // this usage: | WGPUTextureUsage_StorageBinding; is incompatibale withWGPUTextureFormat_R8Unorm format, might f32 aka float might just be ok
+	textureDesc.format = WGPUTextureFormat_RGBA32Float;
 	// I need to set the feature WGPUTextureFormat_R32Float if i want to use linear filter(sampling) stufff
 	
 	textureDesc.usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_StorageBinding; // sampling it from a shader | copy pixel data from CPU 
@@ -1832,7 +1833,8 @@ void Application::ComputePassCreatTexture(){
 	*/
 	textureBindingLayout.visibility = WGPUShaderStage_Compute;
 	textureBindingLayout.storageTexture.access = WGPUStorageTextureAccess_WriteOnly;
-	textureBindingLayout.storageTexture.format = WGPUTextureFormat_R32Float;
+	textureBindingLayout.storageTexture.format = WGPUTextureFormat_RGBA32Float;
+	//textureBindingLayout.storageTexture.format = WGPUTextureFormat_R32Float;
 	textureBindingLayout.storageTexture.viewDimension = WGPUTextureViewDimension_2D;
 
 	WGPUBindGroupLayoutDescriptor bindGroupLayoutDesc{};
@@ -1894,8 +1896,10 @@ computeLayout = wgpuDeviceCreatePipelineLayout(device, &pipelineLayoutDesc);
 	uint32_t invocationCountX = m_textureSize.width;
 	uint32_t invocationCountY = m_textureSize.height;
 	*/
-	//uint32_t invocationCount = 512;
-	uint32_t invocationCount = 256;
+	uint32_t invocationCount = 512;
+	//uint32_t invocationCount = 256;
+	//uint32_t invocationCount = 1024;
+
 	uint32_t workgroupSizePerDim = 4;
 	// This ceils invocationCountX / workgroupSizePerDim
 	uint32_t workgroupCount = (invocationCount + workgroupSizePerDim - 1) / workgroupSizePerDim;

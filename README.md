@@ -8,11 +8,7 @@ cmake --build build
 Then the executeble should be called App and be placed in ./build/Debug directory
 
 # inspiration and general information:
-The project renders procedural terrain using raymarching techniques in WebGPU. 
-It also tests cone-marching for optimization.
-This project fokused on learning the WebGPU standard, Especially fokused on Interfacing with it 
-using C++. For now it's nativly built using Googles implementation of the WebGPU standard called Dawn.
-So the goal was to learn some WebGPU while creating something intressting and funn.
+The project renders procedural terrain using raymarching techniques in WebGPU. It also tests cone-marching for optimization. This project focused on learning the WebGPU standard, Especially focused on Interfacing with it using C++. For now it's natively built using Googles implementation of the WebGPU standard called Dawn. So the goal was to learn some WebGPU while creating something interesting and fun.
 
 The webtutorial [*WebGPU For native graphics in C++*](https://eliemichel.github.io/LearnWebGPU/) 
 was substantially used. The article [*Cone Marching in Three.js*](https://medium.com/@nabilnymansour/cone-marching-in-three-js-6d54eac17ad4)

@@ -1,7 +1,10 @@
 # Building and executing
 call the commands under 
+
 cmake -S . -B build
+
 cmake --build build
+
 Then the executeble should be called App and be placed in ./build/Debug directory
 
 # inspiration and general information:

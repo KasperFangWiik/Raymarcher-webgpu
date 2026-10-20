@@ -94,7 +94,7 @@ fn vs_main(vertIn: VertexInput) -> VertexOutput {
 
     rd.y *= -1.0; // flip y coordinate because it's fliped in wgsl
 
-    let layers: i32 = 10; 
+    let layers: i32 = 7; 
     let fov: f32 = (In.iResolution.x/In.iResolution.y);//radians(90);//radians(30);//radians(45);//radians(90);//3.14159265/100.;//*0.5;//*2.0;//3.14159265 * 0.5;//3.14159265;//3.14159265 * 0.5;//1.5708;//90degree// 0.7854;//PI/4.0;
 
     let coneVal: vec2f = Conemarch( ro, rd, fov, layers);
@@ -244,14 +244,15 @@ fn get_random_noize_corner(ij: vec2f) -> f32{
 
 
 // generate the four coners depending on xz-coordinates and then SmoothStep between them
-
+/*
 
 fn f(p: vec2f)-> f32{
     let noiseTextureSize = 256.0;
     let rayPosInUV = (p + 0.5) / noiseTextureSize;// + 0.5 centers in the center of the texel
     return textureSampleLevel(grayNoiseTexture, textureSampler, rayPosInUV, 0.0).r;
 }
-/*
+*/
+
 fn f(p: vec2f)-> f32{
 
     //float i = ij.x;
@@ -288,32 +289,7 @@ fn f(p: vec2f)-> f32{
     return (a_ij + ba_difz + ca_difx + abcd_dif*s_x*s_z);
 }
 
-
-fn mountainNormal(p: vec3f, normls_layers: i32) -> vec3f{
-    //const float EPS = 0.000001;
-    let EPS: f32 = 0.005;//0.0005;
-    
-    /*
-    n = Cross_product( (1., df/dz ,0.) , (0., df/dx ,1.) =>
-    n = ( -df/dx , 1. , -df/dz )
-    */
-    
-    // vec3(x, y, z)
-    
-    // Sample the ground sdf in x-axis and z-axis
-    let x0_sampl: f32 = SDF_scene(p + vec3f(EPS, 0.0, 0.0),normls_layers,false).sd;
-    let x1_sampl: f32 = SDF_scene(p - vec3f(EPS, 0.0, 0.0),normls_layers,false).sd;
-    
-    let z0_sampl: f32 = SDF_scene(p + vec3f(0.0, 0.0, EPS),normls_layers,false).sd;
-    let z1_sampl: f32 = SDF_scene(p - vec3f(0.0, 0.0, EPS),normls_layers,false).sd;
-    
-    // getting the difference/change in x-axis and z-axis
-    let neg_dx: f32 = x0_sampl - x1_sampl ; // = -( x0_sampl - x1_sampl)
-    let neg_dz: f32 = z0_sampl - z1_sampl; // = -( z0_sampl - z1_sampl)
-    
-    return normalize(vec3f(neg_dx, EPS, neg_dz));
-}
-*/
+/*
 fn f_df(p: vec2f) -> vec3f{
     let noiseTextureSize = 256.0;
     let rayPosInUV = (p ) / noiseTextureSize;// + 0.5 centers in the center of the texel
@@ -337,7 +313,7 @@ fn f_df(p: vec2f) -> vec3f{
 
     return vec3f(f_val,df);
 }
-/*
+*/
 fn f_df(p: vec2f) -> vec3f{
 
     // creat a descreat grid
@@ -383,7 +359,8 @@ fn f_df(p: vec2f) -> vec3f{
     df.y = (b_ij - a_ij)* s_dz + abcd_dif*s_x*s_dz;
      
     return vec3f(f_val,df);
-}*/
+}
+
 
 fn N_func(p: vec2f, coord_scale: f32, layers: i32) -> f32{
     //return f(p);
@@ -707,7 +684,7 @@ fn Rmin(currentMinDist: f32,h: f32,t: f32) -> f32{
 fn sh(p: vec3f, lightDir: vec3f, EPS: f32, layers: i32) -> f32{
     
     var stepsize: f32= 0.;
-    var t: f32 = EPS*10.;//0.5; // shadow acne stepout
+    var t: f32 = EPS*2.;//10.0//0.5; // shadow acne stepout
     //vec3 lightDir = normalize(l - p);
     var hp: vec3f = vec3f(0.0);
     var d: f32 = 0.0;
@@ -722,11 +699,11 @@ fn sh(p: vec3f, lightDir: vec3f, EPS: f32, layers: i32) -> f32{
             break;
         }
             
-        if( d <= 0.0005 *min(f32(i*i),1000.) ) {//*min(float(i*i),10.) min(f32(i*i),1000.)
+        if( d <= 0.0005 *min(f32(i*i),1000.) ) {///0.0005 *min(f32(i*i),1000.)/*min(float(i*i),10.) min(f32(i*i),1000.)
             return 0.;
         }
         old_t = t;
-        stepsize = d*0.3;//max(d * 0.4, 0.001);
+        stepsize = d*0.3;//0.3;//max(d * 0.4, 0.001);
         t += stepsize;
        
     }
@@ -803,15 +780,16 @@ fn Raymarch(ro: vec3f, rd: vec3f, start_t_distance: f32, start_index: i32)-> vec
     var shadow_acne_EPS: f32 = 1.0;
     
     var is_analytic: bool = true;//false;// funkar inte med "normal_layer" (måste beräkna hela)
-    var physical_layers: i32 = 10;
+    var physical_layers: i32 = 7;
     var normal_layers: i32 = 10;
     
     // LOD verkar i
     /*
-    bool lod_on = false;
-    int low_LOD_layers = 5;
-    int high_LOD_layers = 10;
+    let lod_on: bool = false;
+    let low_LOD_layers:i32 = 5;
+    let high_LOD_layers:i32 = 10;
     */
+    
     
     // 145, 197, 250 "rgb sky blue"
     var col: vec4f = vec4f(145./256., 197./256., 250./256.,1.); // vec4(1, 1, 1, 1);                  
@@ -823,8 +801,9 @@ fn Raymarch(ro: vec3f, rd: vec3f, start_t_distance: f32, start_index: i32)-> vec
       p = ro + rd*t;
       // minst vara 5 och max vara 8
       
-      /*
+      
       // möjligtvis dåligt för "threads" divergar för ofta
+      /*
       if(lod_on){
           if(t >= 8000. && t < 4000. ){
                physical_layers = low_LOD_layers;//max(5, min(8, 20 / i));//physical_layers;
@@ -834,7 +813,7 @@ fn Raymarch(ro: vec3f, rd: vec3f, start_t_distance: f32, start_index: i32)-> vec
                physical_layers = high_LOD_layers;//max(5, min(8, 20 / i));     
           }
           }
-      */ 
+      */
       
       b = SDF_scene(p,physical_layers,false);
       var d: f32 = b.sd;
@@ -846,12 +825,12 @@ fn Raymarch(ro: vec3f, rd: vec3f, start_t_distance: f32, start_index: i32)-> vec
       
       if(d < 0.){  
             p = bisection(ro, rd, old_t, t, 5, 0.0005, physical_layers, is_analytic);  
-            shadow_acne_EPS *= 4.; // need to look in to the best number for this..
+            shadow_acne_EPS *= 2.;//4.; // need to look in to the best number for this..
         } 
         
       if(d <= EPS_colid*min(f32(i),10.)){ // *min(float(i),10.)
             p = bisection(ro, rd, old_t, t+EPS_colid, 5, 0.0005, physical_layers, is_analytic);  
-            shadow_acne_EPS *= 4.;
+            shadow_acne_EPS *= 2.;//4.;
             
             var n: vec3f = vec3f(0.0);
             if(is_analytic){

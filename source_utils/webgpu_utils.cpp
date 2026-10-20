@@ -228,7 +228,7 @@ void setDefaultLimits(WGPULimits &limits){
 ///// Device
 ////////////////////////////////////////////////////////////////////////////////////////
 
-/* 
+/*
 A WebGPU device represents a context of use of the API. All the objects that we create 
 (geometry, textures, etc.) are owned by the device.
 
@@ -237,7 +237,8 @@ that we are interesed in. Once the device is created, the adapter should no long
 The only capabilities that matter to the application are the ones of the device.
 */
 
-/* Utility function to get a WebGPU device, so that
+/* Taken from: https://eliemichel.github.io/LearnWebGPU/ 
+ * Utility function to get a WebGPU device, so that
  *     WGPUDevice device = requestDeviceSync(adapter, options);
  * is roughly equivalent to
  *     const device = await adapter.requestDevice(descriptor);
@@ -1163,7 +1164,7 @@ void Application::MainLoop(){
 	WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(device, &encoderDesc);
 
 //// Setting up querySet's for timeStamps used to meshure the start and end of a render pass, need TimeStamp_query feature	
-	bool reachedTimestampLimit = ( ((querySetCounter/2)+1) > numberOfQuerySets ); // querySetCounter = {0,2,5,6  , 8} om numberOfQuerySets = 4
+	bool reachedTimestampLimit = ( ((querySetCounter/2)+1) > numberOfQuerySets ); // querySetCounter = {0,2,5,6,8} om numberOfQuerySets = 4
 	
 	WGPURenderPassEncoder renderPass{};
 	if(!reachedTimestampLimit){ // then we should not set a new querySet...
@@ -1171,7 +1172,7 @@ void Application::MainLoop(){
 		timestampWrites.querySet = timestampQuerySet; // do we need a new querySet for each time stamp...
 		timestampWrites.beginningOfPassWriteIndex = static_cast<uint32_t>(querySetCounter);//0;
 		timestampWrites.endOfPassWriteIndex = ++querySetCounter;//1;
-		++querySetCounter; // 
+		++querySetCounter;
 
 		// Encode the renderpass
 		renderPass = encodeRenderPass(encoder, targetView, &timestampWrites);
@@ -1203,6 +1204,7 @@ bool allTimestampsAreQueued = ( querySetCounter == (numberOfQuerySets*2)) ;
 		wgpuCommandEncoderCopyBufferToBuffer(encoder, timestampBuffer, sourceOffset, mappedTimeBuffer, destinationOffset, timestapBufferSize); // we could count how many wgpuCommandEncoderResolveQuerySet we have called and only compy the hoal timestampBuffer when it's full..... Maby waste fullllllll
 	}
 ////////////////////////////////
+
 	/////////////// CommandBuffer, send the encoder's command to the GPU
 	WGPUCommandBufferDescriptor cmdDesc = {};
 	WGPUCommandBuffer commandBuffer = wgpuCommandEncoderFinish(encoder, &cmdDesc);
@@ -1388,7 +1390,7 @@ WGPURequiredLimits Application::setRequredLimits(/*WGPUAdapter adapter*/) const{
 	// We should also tell that we use 1 vertex buffers
 	requiredLimits.limits.maxVertexBuffers = 1;
 
-	/* WE SHOULD CHANGE THE BLIMITS.MAXBUFFER SIZE DEPENDING ON IF WE DO SUBDIVISON!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	/* WE SHOULD CHANGE THE BLIMITS.MAXBUFFER SIZE DEPENDING ON IF WE DO SUBDIVISON!
 
 	uint16_t quadSize = 32;
 	uint16_t vertexSize = quadSize + 1;
@@ -1757,15 +1759,16 @@ void Application::InitializeTextureSampler(){
 	samplerDesc.addressModeU = WGPUAddressMode_Repeat;
 	samplerDesc.addressModeV = WGPUAddressMode_Repeat;
 	samplerDesc.addressModeW = WGPUAddressMode_Repeat; // third dimension not needed...
+// revisit the linse under this
 samplerDesc.compare = WGPUCompareFunction_Undefined;
 samplerDesc.label ="first Sampler";
-samplerDesc.lodMaxClamp = 1.0f; // WHY THIS
-samplerDesc.lodMinClamp = 0.0f; // WHY THIS
+samplerDesc.lodMaxClamp = 1.0f; 
+samplerDesc.lodMinClamp = 0.0f;
 
-samplerDesc.magFilter = WGPUFilterMode_Linear; // // WHY THIS
+samplerDesc.magFilter = WGPUFilterMode_Linear;
 samplerDesc.minFilter = WGPUFilterMode_Linear;
 samplerDesc.mipmapFilter = WGPUMipmapFilterMode_Linear;
-samplerDesc.maxAnisotropy = 1; // WHY THIS
+samplerDesc.maxAnisotropy = 1;
 
 
  sampler = wgpuDeviceCreateSampler(device, &samplerDesc);

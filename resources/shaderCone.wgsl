@@ -1,3 +1,13 @@
+
+
+/*
+This SDF and the underlying logic for cone-marching for one pass
+is takenfrom the article:
+"Cone Marching in Three.js"
+https://medium.com/@nabilnymansour/cone-marching-in-three-js-6d54eac17ad4
+This was done to test the conemarch implementations validity and performance. 
+*/
+
 struct UniformStruct {
     iResolution: vec2f,
     iMouse: vec2f,

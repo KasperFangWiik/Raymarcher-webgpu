@@ -60,14 +60,13 @@ fn N_func(p: vec2f, coord_scale: f32, layers: i32) -> f32{
 
 @compute @workgroup_size(4,4)
 fn cs_main(@builtin(global_invocation_id) id: vec3<u32>){
-    /*
+    
     let xy: vec2f = vec2f(id.xy);
     let p = fract(xy * vec2f(123.34, 456.21));
     let p2 = p + dot(p, p + 45.32);
     textureStore(grayNoiseTexture, id.xy, vec4f(fract(p2.x * p2.y) * 2.0 - 1.0, 0.0, 0.0, 0.0) );
-    */
-
-    textureStore(grayNoiseTexture, id.xy, vec4f(f(vec2f(id.xy)), 0.0, 0.0, 0.0) );
+    
+    //textureStore(grayNoiseTexture, id.xy, vec4f(f(vec2f(id.xy)), 0.0, 0.0, 0.0) );
 
     //textureStore(grayNoiseTexture, id.xy, vec4f(N_func(vec2f(id.xy), 0.002, 10), 0.0, 0.0, 0.0) );
 }

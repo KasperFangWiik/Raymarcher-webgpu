@@ -17,5 +17,5 @@ So the goal was to learn some WebGPU while creating something intressting and fu
 The webtutorial [*WebGPU For native graphics in C++*](https://eliemichel.github.io/LearnWebGPU/) 
 was substantially used. The article [*Cone Marching in Three.js*](https://medium.com/@nabilnymansour/cone-marching-in-three-js-6d54eac17ad4)
 was also used for implementing cone-marching for optimization. 
-Inigo Quilez video [*I painted a Landscape with Mathematics"*]https://www.youtube.com/watch?v=BFld4EBO2RE&t=912s)
+Inigo Quilez video [*I painted a Landscape with Mathematics*]https://www.youtube.com/watch?v=BFld4EBO2RE&t=912s)
 was used for infereing the logic underlying the rendering of the procidual terrain.
